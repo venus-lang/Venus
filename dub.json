@@ -1,0 +1,10 @@
+{
+    "name": "venus",
+    "authors": [
+        "zhaopuming"
+    ],
+    "description": "The Venus programming language",
+    "copyright": "Copyright © 2018, venus-lang",
+    "license": "MIT",
+    "targetPath": "bin/"
+}

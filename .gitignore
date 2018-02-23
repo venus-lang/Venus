@@ -13,6 +13,10 @@
 
 # Executables
 *.exe
+bin/
+
+# Tests Executables
+*-test-*
 
 # DUB
 .dub
