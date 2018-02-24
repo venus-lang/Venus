@@ -9,7 +9,60 @@ import std.ascii;
 import venus.context;
 
 unittest {
-    Context ctx = new Context();
+
+    import std.algorithm;
+    // Test import statement
+    {
+        Context ctx = new Context();
+        string code = "import std.io";
+        auto tokens = lex(code, ctx).array;
+        writeln("tokens length:", tokens.length);
+        writeln(tokens);
+        assert(tokens[0].type == TokenType.Begin);
+        assert(tokens[1].type == TokenType.Import);
+        assert(tokens[2].type == TokenType.Identifier);
+        assert(tokens[3].type == TokenType.Dot);
+        assert(tokens[4].type == TokenType.Identifier);
+        assert(tokens[5].type == TokenType.End);
+    }
+
+
+    // Test function definition
+    {
+        Context ctx = new Context();
+        string code = q{fun add(a int, b int) int = a + b};
+        auto tokens = lex(code, ctx).array;
+        assert(tokens[0].type == TokenType.Begin);
+        assert(tokens[1].type == TokenType.Fun);
+        assert(tokens[2].type == TokenType.Identifier);
+        assert(tokens[3].type == TokenType.ParenBegin);
+        assert(tokens[4].type == TokenType.Identifier);
+        assert(tokens[5].type == TokenType.Int);
+        assert(tokens[6].type == TokenType.Comma);
+        assert(tokens[7].type == TokenType.Identifier);
+        assert(tokens[8].type == TokenType.Int);
+        assert(tokens[9].type == TokenType.ParenEnd);
+        assert(tokens[10].type == TokenType.Int);
+        assert(tokens[11].type == TokenType.Assign);
+        assert(tokens[12].type == TokenType.Identifier);
+        assert(tokens[13].type == TokenType.Plus);
+        assert(tokens[14].type == TokenType.Identifier);
+        assert(tokens[15].type == TokenType.End);
+    }
+    {
+
+        Context ctx = new Context();
+        string code = q{
+            import std.io;
+            fun add(a int, b int) int { a + b }
+
+            main { println(add(a, b)) }
+        };
+        auto tokens = lex(code, ctx).array;
+        tokens.each!writeln;
+
+    }
+
     string code = q{
         // one-line comment
         /*
@@ -83,24 +136,31 @@ unittest {
         }
 
     };
+    auto ctx = new Context();
     auto lexer = lex(code, ctx);
+    /*
     foreach (tok; lexer) {
         writeln(ctx.getTokenString(tok));
     }
+    */
     writeln("testing lexer end.");
 }
 
 alias isUniAlpha = std.uni.isAlpha;
 alias isPunct = std.ascii.isPunctuation;
 
-struct Lexer(R) {
+//
+// Lexer returns a range of Tokens from a source type R
+//
+struct Lexer {
 
     Token t;
-    R r;
+    const(char)[] r;
     Context context;
 
     uint line = 1;
     uint index = 0;
+    bool isFinished = false;
 
     @property auto front() inout {
         return t;
@@ -115,20 +175,17 @@ struct Lexer(R) {
     }
 
     @property bool empty() const {
-        return t.type == TokenType.Fin;
+        return isFinished;
     }
 
 private:
     auto getNextToken() {
-        while (1) {
+        while (true) {
             if (r.empty()) {
                 if (t.type == TokenType.End) {
-                    Token t;
-                    t.type = TokenType.Fin;
-                    return t;
-                } else {
-                    return lexEnd();
+                    isFinished = true;
                 }
+                return lexEnd();
             }
             dchar f = r.front;
             switch (f) {
@@ -163,20 +220,19 @@ private:
             }
         }
     }
-    
+
     void popChar() {
         r.popFront();
         ++index;
     }
-    
+
     auto nextChar() {
         r.popFront();
         ++index;
-        if (r.empty()) 
-            return EOF;
+        if (r.empty()) return EOF;
         return r.front;
     }
-    
+
 private: // lex parts
     Token lexLineSep() {
         auto c = r.front;
@@ -208,14 +264,14 @@ private: // lex parts
         }
         tok.name = context.getName(name);
         return tok;
-    }   
-    
+    }
+
 
     void setLoc(ref Token tok) {
         tok.loc.line = line;
         tok.loc.index = index;
     }
-    
+
     Token lexNumeric() {
         Token tok;
         tok.type = TokenType.IntLiteral;
@@ -230,7 +286,7 @@ private: // lex parts
 
         return tok;
     }
-    
+
     Token lexString() {
         Token tok;
         setLoc(tok);
@@ -242,7 +298,7 @@ private: // lex parts
             c = nextChar();
         }
         popChar(); // '"'
-        
+
         tok.type = TokenType.StringLiteral;
         tok.name = context.getName(name);
         return tok;
@@ -265,7 +321,7 @@ private: // lex parts
     }
 
     Token lexIdentifier() {
-        
+
         auto c = r.front;
         if (!c.isIdChar) {
             writeln("lex error at:", r);
@@ -288,15 +344,15 @@ private: // lex parts
 
         return tok;
     }
-    
+
     Token lexEnd() {
         Token tok;
         setLoc(tok);
         tok.type = TokenType.End;
         return tok;
     }
-    
-    
+
+
     // TODO: argument 'dchar f' here is unintuitive....
     Token lexOperator(dchar f) {
         Token tok;
@@ -346,7 +402,7 @@ private: // lex parts
             while (c != '\n' && c != '\r') {
                 c = nextChar();
             }
-            
+
             popChar();
             if (c == '\r') {
                 if (r.front == '\n') popChar();
@@ -357,7 +413,7 @@ private: // lex parts
                 while (c != '*' && c != '\r' && c != '\n') {
                     c = nextChar();
                 }
-                
+
                 auto match = c;
                 c = nextChar();
                 switch (match) {
@@ -371,7 +427,7 @@ private: // lex parts
                         if (c == '\n') {
                             c = nextChar();
                         }
-                        
+
                         line++;
                         break;
                     case '\n':
@@ -387,9 +443,9 @@ private: // lex parts
 }
 
 
-auto lex(R)(R r, Context ctx) if (isForwardRange!R) {
+auto lex(in char[] r, Context ctx) {
 
-    auto lexer = Lexer!R();
+    auto lexer = Lexer();
     lexer.r = r.save;
     lexer.context = ctx;
     lexer.t.type = TokenType.Begin;

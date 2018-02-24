@@ -1,5 +1,6 @@
 ﻿module venus.ast;
 
+import std.experimental.logger;
 import venus.context;
 import std.conv: to;
 
@@ -12,6 +13,20 @@ class AstNode {
     override string toString() {
         import std.conv: to;
         return "Node:" ~ loc.to!string;
+    }
+}
+
+class RootNode :AstNode {
+    AstNode[] children;
+
+public:
+    this(Location loc) {
+        super(loc);
+    }
+
+    void addChild(AstNode n) {
+        info("adding chld:", n);
+        children ~= n;
     }
 }
 

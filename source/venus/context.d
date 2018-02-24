@@ -16,27 +16,27 @@ struct Token {
 
 enum TokenType {
     Invalid = 0, Begin, End, Fin,
-    
+
     // Literals
     Identifier, StringLiteral, CharLiteral, IntLiteral, FloatLiteral,
-    
+
     // Keywords
 
     // Object/Type
     Val, Var, Ptr, Ref, Void,
-    
+
     // Builtin Type
     Bit, Byte, Char, Short, Int, Long, Float, Double,
-    
-    
+
+
     // Control flow
     Do, Else, If, While, In, Return, For,
-    
+
     // Seperators
     BraceBegin, BraceEnd,
     ParenBegin, ParenEnd,
     SquareBegin, SquareEnd,
-    
+
     // Operators
     Plus, // '+'
     Minus, // '-'
@@ -51,7 +51,7 @@ enum TokenType {
     NotEqual, // '!='
     Not, // '!'
     Colon, // ':'
-    
+
     // Language
     Fun,
     Import, Extern, LineSep, 
@@ -86,30 +86,34 @@ struct NameManager {
 private:
     string[] names;
     uint[string] lookups;
-    
+
     // make it not copyable
     @disable this(this);
-    
+
 package:
     static get() {
         return NameManager(Names, Lookups);
     }
-    
+
 public:
     auto getName(string s) {
         if (auto id = s in lookups) {
             return Name(*id);
         }
-        
+
         // Do not keep around slice of potentially large input.
         s = s.idup; // similar problem to old java's string
-        
+
         auto id = lookups[s] = cast(uint) names.length;
         names ~= s;
-        
+
         return Name(id);
     }
-    
+
+    string lookup(ref in Name n) {
+        return names[n.id];
+    }
+
     string getTokenString(Token tok) {
         import std.string: rightJustify;
         return "Token:\t" 
@@ -123,7 +127,7 @@ public:
     string getTokenName(Token tok) {
         return tok.name.toString(this);
     }
-    
+
     void printLookups() {
         writeln("Lookups:", lookups);
         writeln("Names:", names);
@@ -134,7 +138,7 @@ public:
 final class Context {
     NameManager nameManager;
     alias nameManager this;
-    
+
     this() { nameManager = NameManager.get(); }
 }
 
@@ -161,9 +165,9 @@ public {
             "]" : SquareEnd,
             ":" : Colon,
         ];
-        
+
     }
-    
+
     auto getKeywordsMap() {
         with(TokenType) return [
             // built-in types
@@ -198,12 +202,12 @@ public {
             "fun": Fun,
         ];
     }
-    
+
 }
 
 public {
     enum Reserved = ["__ctor", "__dtor", "__vtbl"];
-    
+
     enum Prefill = [
         // Linkages
         "C", "D", "C++", "Windows", "System", "Pascal", "Java", "Venus",
@@ -217,9 +221,9 @@ public {
         "main", "_vmain",
         // Attribute
         "property", "unsafe", "dynamic", "alloc",
-        
+
     ];
-    
+
     auto getNames() {
         auto identifiers = [""];
         foreach (k, _; getOperatorsMap()) {
@@ -228,14 +232,14 @@ public {
         foreach (k, _; getKeywordsMap()) {
             identifiers ~= k;
         }
-        
+
         return identifiers ~ Reserved ~ Prefill;
     }
-    
+
     enum Names = getNames();
-    
+
     static assert(Names[0] == "");
-    
+
     auto getLookups() {
         uint[string] lookups;
         foreach (uint i, id; Names) {
@@ -243,9 +247,9 @@ public {
         }
         return lookups;
     }
-    
+
     enum Lookups = getLookups();
-    
+
     enum OperatorsMap = getOperatorsMap();
     enum KeywordsMap = getKeywordsMap();
 }
